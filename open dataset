@@ -1,0 +1,45 @@
+// JavaScript code (umdfacesDataExtractor.js)
+
+const fs = require('fs').promises;
+
+// Function to extract dataset information from HTML content
+async function extractDatasetInfo(htmlContent) {
+    try {
+        // Regular expression to match links to the dataset files
+        const datasetRegex = /href="([^"]*\/UMD_Faces.*)"/g;
+        const datasetLinks = [];
+        let match;
+
+        // Find all matches of the dataset links in the HTML content
+        while ((match = datasetRegex.exec(htmlContent)) !== null) {
+            datasetLinks.push(match[1]);
+        }
+
+        return datasetLinks;
+    } catch (error) {
+        throw new Error("Error extracting dataset information: " + error.message);
+    }
+}
+
+// Function to save extracted dataset information to a file
+async function saveDatasetInfo(datasetInfo) {
+    try {
+        await fs.writeFile('umdfacesDatasetInfo.json', JSON.stringify(datasetInfo, null, 2));
+        console.log("Dataset information saved successfully!");
+    } catch (error) {
+        throw new Error("Error saving dataset information: " + error.message);
+    }
+}
+
+// Read HTML content from the saved file
+fs.readFile('umdfacesHtmlContent.html', 'utf8')
+    .then(htmlContent => {
+        // Extract dataset information
+        const datasetInfo = extractDatasetInfo(htmlContent);
+
+        // Save extracted dataset information to a file
+        return saveDatasetInfo(datasetInfo);
+    })
+    .catch(error => {
+        console.error("Error:", error);
+    });
