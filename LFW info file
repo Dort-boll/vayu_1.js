@@ -1,0 +1,57 @@
+// JavaScript code (lfwDataFetcher.js)
+
+const axios = require('axios');
+const fs = require('fs').promises;
+const cheerio = require('cheerio');
+
+// Function to fetch data from the provided link
+async function fetchLfwData() {
+    try {
+        const response = await axios.get('https://vis-www.cs.umass.edu/lfw/');
+        const data = response.data;
+
+        // Process the fetched data
+        const processedData = processLfwData(data);
+
+        // Save processed data to a file
+        await saveProcessedData(processedData);
+
+        console.log("LFW data fetched, processed, and saved successfully!");
+    } catch (error) {
+        console.error("Error fetching LFW data:", error);
+    }
+}
+
+// Function to process LFW data
+function processLfwData(data) {
+    try {
+        // Load HTML data using Cheerio
+        const $ = cheerio.load(data);
+
+        // Extract relevant information from HTML elements
+        const title = $('title').text();
+        const paragraphs = $('p').map((index, element) => $(element).text()).get();
+
+        // Construct processed data object
+        const processedData = {
+            title,
+            paragraphs
+        };
+
+        return processedData;
+    } catch (error) {
+        throw new Error("Error processing LFW data: " + error.message);
+    }
+}
+
+// Function to save processed data to a file
+async function saveProcessedData(processedData) {
+    try {
+        await fs.writeFile('lfwData.json', JSON.stringify(processedData, null, 2));
+    } catch (error) {
+        throw new Error("Error saving processed LFW data: " + error.message);
+    }
+}
+
+// Call fetchLfwData function to start fetching LFW data
+fetchLfwData();
