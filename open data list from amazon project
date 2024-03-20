@@ -1,0 +1,106 @@
+// JavaScript code (dataFetcher.js)
+
+const axios = require('axios');
+const fs = require('fs').promises;
+const { spawn } = require('child_process');
+
+// List of data sources to fetch
+const dataSources = [
+    { name: 'Amazon', url: 'https://snap.stanford.edu/data/bigdata/amazon/amazon-meta.txt.gz' },
+    { name: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Main_Page' }
+];
+
+// Function to fetch data from a given URL
+async function fetchData(url) {
+    try {
+        const response = await axios.get(url, { responseType: 'arraybuffer' });
+        return response.data.toString('utf8');
+    } catch (error) {
+        throw new Error(`Error fetching data from ${url}: ${error.message}`);
+    }
+}
+
+// Function to process Amazon data
+function processAmazonData(data) {
+    try {
+        const lines = data.split('\n');
+        const asins = lines.map(line => {
+            const parts = line.split('|');
+            if (parts.length > 1) {
+                return parts[1].trim(); // Extracting ASIN (Amazon Standard Identification Number)
+            }
+            return null;
+        }).filter(asin => asin !== null);
+        return asins;
+    } catch (error) {
+        throw new Error("Error processing Amazon data: " + error.message);
+    }
+}
+
+// Function to process Wikipedia data
+function processWikipediaData(data) {
+    try {
+        // Implement your processing logic for Wikipedia data here
+        return { pageTitle: "Sample Wikipedia Page" }; // Sample processing: Extract page title
+    } catch (error) {
+        throw new Error("Error processing Wikipedia data: " + error.message);
+    }
+}
+
+// Function to save processed data to a file
+async function saveProcessedData(data, fileName) {
+    try {
+        await fs.writeFile(fileName, JSON.stringify(data, null, 2));
+        console.log(`Processed data saved to ${fileName}`);
+    } catch (error) {
+        throw new Error(`Error saving processed data to ${fileName}: ${error.message}`);
+    }
+}
+
+// Function to transfer processed data to Python file for further processing
+function transferDataToPython() {
+    try {
+        const pythonProcess = spawn('python', ['dataProcessing.py']);
+        pythonProcess.stdout.on('data', (data) => {
+            console.log(`Python Output: ${data}`);
+        });
+        pythonProcess.stderr.on('data', (data) => {
+            console.error(`Python Error: ${data}`);
+        });
+        pythonProcess.on('close', (code) => {
+            console.log(`Python process exited with code ${code}`);
+        });
+    } catch (error) {
+        console.error("Error transferring data to Python:", error);
+    }
+}
+
+// Fetch and process data from each data source
+async function fetchDataFromSources() {
+    for (const source of dataSources) {
+        try {
+            const data = await fetchData(source.url);
+            let processedData;
+            switch (source.name) {
+                case 'Amazon':
+                    processedData = processAmazonData(data);
+                    break;
+                case 'Wikipedia':
+                    processedData = processWikipediaData(data);
+                    break;
+                // Add more cases for additional data sources
+                default:
+                    console.warn(`Processing for ${source.name} not implemented.`);
+                    continue;
+            }
+            await saveProcessedData(processedData, `${source.name.toLowerCase()}Data.json`);
+        } catch (error) {
+            console.error(error.message);
+        }
+    }
+    // Transfer processed data to Python file
+    transferDataToPython();
+}
+
+// Start fetching data from sources
+fetchDataFromSources();
