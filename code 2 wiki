@@ -1,0 +1,122 @@
+// JavaScript code (combinedProcessing.js)
+
+const axios = require('axios');
+const fs = require('fs').promises; // Using promises-based file system module
+const schedule = require('node-schedule');
+const { spawn } = require('child_process');
+
+// Function to fetch data from Wikipedia
+async function fetchData() {
+    try {
+        const response = await axios.get('https://en.wikipedia.org/wiki/Main_Page');
+        // Process the fetched data
+        const processedData = await processWikipediaData(response.data);
+
+        // Save processed data to a file
+        await saveProcessedData(processedData);
+
+        console.log("Data fetched, processed, and saved successfully!");
+
+        // Transfer processed data to Python file for further processing
+        await transferDataToPython(processedData);
+    } catch (error) {
+        console.error("Error fetching data:", error);
+    }
+}
+
+// Function to process Wikipedia data
+async function processWikipediaData(data) {
+    try {
+        const [sections, metadata] = await Promise.all([
+            extractSections(data),
+            extractMetadata(data)
+        ]);
+        const processedData = {
+            sections,
+            metadata
+        };
+        return processedData;
+    } catch (error) {
+        throw new Error("Error processing Wikipedia data: " + error.message);
+    }
+}
+
+// Function to extract sections from Wikipedia data
+async function extractSections(data) {
+    try {
+        const sectionIds = ['mp-upper', 'mp-tfa', 'mp-itn']; // IDs of sections to extract
+        const sectionPromises = sectionIds.map(sectionId => extractSection(data, sectionId));
+        const sections = await Promise.all(sectionPromises);
+        return Object.fromEntries(sections);
+    } catch (error) {
+        throw new Error("Error extracting sections: " + error.message);
+    }
+}
+
+// Function to extract a specific section from Wikipedia data
+async function extractSection(data, sectionId) {
+    try {
+        const startTag = `<div id="${sectionId}">`;
+        const endTag = '<!-- /section -->';
+        const startIndex = data.indexOf(startTag);
+        const endIndex = data.indexOf(endTag, startIndex);
+        if (startIndex !== -1 && endIndex !== -1) {
+            const sectionContent = data.substring(startIndex + startTag.length, endIndex);
+            return [sectionId, sectionContent.trim()]; // Return section ID and content
+        } else {
+            throw new Error(`Section ${sectionId} not found`);
+        }
+    } catch (error) {
+        throw new Error("Error extracting section " + sectionId + ": " + error.message);
+    }
+}
+
+// Function to extract metadata from Wikipedia data
+async function extractMetadata(data) {
+    try {
+        // Simulate extraction of metadata
+        const titleStart = data.indexOf('<title>') + '<title>'.length;
+        const titleEnd = data.indexOf('</title>', titleStart);
+        const pageTitle = data.substring(titleStart, titleEnd);
+
+        return { pageTitle };
+    } catch (error) {
+        throw new Error("Error extracting metadata: " + error.message);
+    }
+}
+
+// Function to save processed data to a file
+async function saveProcessedData(processedData) {
+    try {
+        await fs.writeFile('processedData.json', JSON.stringify(processedData, null, 2));
+    } catch (error) {
+        throw new Error("Error saving processed data: " + error.message);
+    }
+}
+
+// Function to transfer processed data to Python file for further processing
+async function transferDataToPython(processedData) {
+    try {
+        const pythonProcess = spawn('python', ['dataProcessing.py', JSON.stringify(processedData)]);
+        pythonProcess.stdout.on('data', (data) => {
+            console.log(`Python Output: ${data}`);
+        });
+        pythonProcess.stderr.on('data', (data) => {
+            console.error(`Python Error: ${data}`);
+        });
+        pythonProcess.on('close', (code) => {
+            console.log(`Python process exited with code ${code}`);
+        });
+    } catch (error) {
+        console.error("Error transferring data to Python:", error);
+    }
+}
+
+// Schedule periodic data fetching
+schedule.scheduleJob('0 */6 * * *', () => {
+    // Run fetchData every 6 hours
+    fetchData();
+});
+
+// Call fetchData immediately to start data fetching
+fetchData();
